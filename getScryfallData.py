@@ -26,16 +26,22 @@ listOfCards = [list(i) for i in result]
 
 for r in listOfCards:
     try:
+        print('<><><><><><><><><><><><><><><><>')
+        print(r[0])
         #card = scrython.cards.Named(exact="Cruel Revival",set="ONS")
         card = scrython.cards.Named(exact=r[0],set=r[1])
 
-        #print(card.name())
         #card names can have single quotes
         cardName = r[0].replace("'", "''")
 
         #print(card.prices('usd'))
         price = card.prices('usd')
+        if not price:
+            price = 0.0
 
+        foilPrice = card.prices('usd_foil')
+        if not foilPrice:
+            foilPrice = 0.0
         #print(card.type_line())
         type = card.type_line()
 
@@ -59,14 +65,14 @@ for r in listOfCards:
 
         sqlString = (
                     "IF NOT EXISTS(SELECT 1 FROM [dbo].[tbl_MTGPriceHistory] WHERE [cardID] = '"+str(cardId)+"' AND [asOfDate] = '"+d1+"') "
-                    "INSERT INTO [dbo].[tbl_MTGPriceHistory] "
-                    "VALUES('"+str(cardId)+"', "+str(price)+", '"+d1+"') "
+                    "INSERT INTO [dbo].[tbl_MTGPriceHistory]  "
+                    "VALUES('"+str(cardId)+"', "+str(price)+", '"+d1+"',"+str(foilPrice)+") "
         )
 
         cursor.execute(sqlString)
         conn.commit()
-
-    except:
+        ##print('card found')
+    except (scrython.foundation.ScryfallError):
         print('card not found')
         pass
 
