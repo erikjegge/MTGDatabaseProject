@@ -28,13 +28,11 @@ for r in listOfCards:
     try:
         print('<><><><><><><><><><><><><><><><>')
         print(r[0])
-        #card = scrython.cards.Named(exact="Cruel Revival",set="ONS")
         card = scrython.cards.Named(exact=r[0],set=r[1])
 
         #card names can have single quotes
         cardName = r[0].replace("'", "''")
 
-        #print(card.prices('usd'))
         price = card.prices('usd')
         if not price:
             price = 0.0
@@ -42,16 +40,22 @@ for r in listOfCards:
         foilPrice = card.prices('usd_foil')
         if not foilPrice:
             foilPrice = 0.0
-        #print(card.type_line())
-        type = card.type_line()
 
-        #print(card.mana_cost())
-        manaCost = card.mana_cost()
+        try:
+            type = card.type_line()
+        except(KeyError):
+            type = ''
 
-        #print(''.join(card.colors()))
-        colors = ''.join(card.colors())
+        try:
+            manaCost = card.mana_cost()
+        except(KeyError):
+            manaCost = ''
 
-        #print(card.id())
+        try:
+            colors = ''.join(card.colors())
+        except(KeyError):
+            colors = ''
+
         cardId = card.id()
 
         sqlString = (
@@ -71,7 +75,7 @@ for r in listOfCards:
 
         cursor.execute(sqlString)
         conn.commit()
-        ##print('card found')
+
     except (scrython.foundation.ScryfallError):
         print('card not found')
         pass
