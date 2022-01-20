@@ -49,9 +49,14 @@ import shutil
 import time
 
 #implementation of threading
+import threading
 from threading import Thread
 from time import perf_counter
 
+#globabls
+# I can only call the API 10 times a second. So this would be the max
+maxthreads = 100
+sema = threading.Semaphore(value=maxthreads)
 
 '''
 Authenticate
@@ -129,6 +134,7 @@ def send_and_archive(card):
 '''
 def ignore_files(dir, files):
     return [f for f in files if os.path.isfile(os.path.join(dir, f))]
+
 '''
     END
 '''
@@ -138,6 +144,8 @@ def ignore_files(dir, files):
     call_cv: Threading try
 '''
 def call_cv(read_image_path, write_image_path, setAbrev):
+    sema.acquire()
+
     print(f'Processing the file {read_image_path}')
     card_results = []
     # Open the image
@@ -173,11 +181,14 @@ def call_cv(read_image_path, write_image_path, setAbrev):
         card_results.insert(2, read_image_path) 
         card_results.insert(3, write_image_path)
         send_and_archive(card_results)
+
+    sema.release()
 '''
     END
 '''
 
 def main():
+
     #start_time = time.time()
 
     source = 'Z:/MTGImages' 
@@ -205,9 +216,16 @@ def main():
     threads = [Thread(target=call_cv, args=(r[0], r[1], r[2]))
         for r in filesToAnalyze]
 
+    theadCount = 1
     # start the threads
     for thread in threads:
         thread.start()
+
+        # solution to limit the number of calls per second? Lets see
+        theadCount += 1
+        if theadCount >= 9:
+            theadCount = 1
+            time.sleep(1.5)
 
     # wait for the threads to complete
     for thread in threads:
