@@ -48,7 +48,9 @@ import shutil
 # will try to time how long this takes
 import time
 
-start_time = time.time()
+#implementation of threading
+from threading import Thread
+from time import perf_counter
 
 
 '''
@@ -84,52 +86,10 @@ remote_image_url = "https://raw.githubusercontent.com/Azure-Samples/cognitive-se
 END - Quickstart variables
 '''
 
-# <snippet_read_call>
 '''
-OCR: Read File using the Read API, extract text - remote
-This example will extract text in an image, then print results, line by line.
-This API call can also extract handwriting style text (not shown).
+    START
+    send_and_archive takes the card object created by the rest of processing and imports it to the database
 '''
-""" print("===== Read File - remote =====")
-# Get an image with text
-read_image_url = "https://raw.githubusercontent.com/MicrosoftDocs/azure-docs/master/articles/cognitive-services/Computer-vision/Images/readsample.jpg"
-
-# Call API with URL and raw response (allows you to get the operation location)
-read_response = computervision_client.read(read_image_url,  raw=True)
-# </snippet_read_call>
-
-# <snippet_read_response>
-# Get the operation location (URL with an ID at the end) from the response
-read_operation_location = read_response.headers["Operation-Location"]
-# Grab the ID from the URL
-operation_id = read_operation_location.split("/")[-1]
-
-# Call the "GET" API and wait for it to retrieve the results 
-while True:
-    read_result = computervision_client.get_read_result(operation_id)
-    if read_result.status not in ['notStarted', 'running']:
-        break
-    time.sleep(1)
-
-# Print the detected text, line by line
-if read_result.status == OperationStatusCodes.succeeded:
-    for text_result in read_result.analyze_result.read_results:
-        for line in text_result.lines:
-            print(line.text)
-            print(line.bounding_box)
-print()
-# </snippet_read_response>
-'''
-END - Read File - remote
-''' """
-
-'''
-OCR: Read File using the Read API, extract text - local
-This example extracts text from a local image, then prints results.
-This API call can also recognize remote image text (shown in next example, Read File - remote).
-'''
-print("===== Read File - local =====")
-
 # takes a list called card
 def send_and_archive(card):
     #connection string
@@ -142,16 +102,10 @@ def send_and_archive(card):
     conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
     cursor = conn.cursor()
 
-    print("<><><><><><><><><><>")
-    print(card[0])
-    #for the sql deal
     cardName = card[0].replace("'", "''")
-    print(card[1])
     read_image_path = card[2]
     write_image_path = card[3]
-    print(read_image_path)
-    print(write_image_path)
-    print("<><><><><><><><><><>")
+
     sqlString = (
             "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath]) "
             "VALUES "
@@ -165,58 +119,27 @@ def send_and_archive(card):
 
     cursor.close()
     conn.close()
+'''
+    END
+'''
 
-
-# Get image path
-#read_image_path = os.path.join (images_folder, "20211230_110259.jpg")
-finalized_List_Cards = []
-list_Of_Images = []
-
-#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# this block makes sure that the archive and the images folder have the same directory structure
-source = 'Z:/MTGImages' 
-destination = 'Z:/MTGArchived'
-
-#shutil.move(source, destination)
-# defining the function to ignore the files
-
-# if present in any folder
+'''
+    START
+    ignore_files is a function that copy tree uses to ignore files when cloning the structure from source to destination
+'''
 def ignore_files(dir, files):
     return [f for f in files if os.path.isfile(os.path.join(dir, f))]
+'''
+    END
+'''
 
-# calling the shutil.copytree() method and
-# passing the src,dst,and ignore parameters
-shutil.copytree(source,destination,ignore=ignore_files, dirs_exist_ok=True)
-#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-
-filesToAnalyze = []
-
-for subdir, dirs, files in os.walk(source):
-        #print(dirs)
-        if subdir != source:
-                #print(subdir)
-                head, tail = os.path.split(subdir)
-                #print(tail)
-                #print(files)
-                if files:
-                        for file in files:
-                                if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                                    sourceFile = os.path.join(subdir,file)
-                                    sourceFile = sourceFile.replace('\\', '/')
-                                    destFile = sourceFile.replace(source,destination)
-                                    #print(os.path.join(subdir,file))
-                                    filesToAnalyze.append([sourceFile,destFile,tail])
-
-for r in filesToAnalyze:
-    #reset the card results
+'''
+    START
+    call_cv: Threading try
+'''
+def call_cv(read_image_path, write_image_path, setAbrev):
+    print(f'Processing the file {read_image_path}')
     card_results = []
-    #loop through the images
-
-    read_image_path = r[0] # The path to the image we want to send to the API
-    print(read_image_path)
-    write_image_path = r[1] # The path to the image we want to send the image to after processing
-    setAbrev = r[2] # the set folder the image is in
-
     # Open the image
     read_image = open(read_image_path, "rb")
 
@@ -232,39 +155,68 @@ for r in filesToAnalyze:
         read_result = computervision_client.get_read_result(operation_id)
         if read_result.status.lower () not in ['notstarted', 'running']:
             break
-        #print ('Waiting for result...')
         time.sleep(10)
 
     # Print results, line by line
     if read_result.status == OperationStatusCodes.succeeded:
         for text_result in read_result.analyze_result.read_results:
             for line in text_result.lines:
-                #print(line.text)
                 card_results.append(line.text)
 
+    #close the image
     read_image.close()
 
     if card_results:
-        #gets the filename, that's all I care about right now
         head, tail = os.path.split(read_image_path)
         card_results.append(tail)
-        #print(tail)
-        #print(setAbrev)
         card_results.insert(1, setAbrev)
-        # storing these for later, don't want to do the move until we start doing the sql inserts
         card_results.insert(2, read_image_path) 
         card_results.insert(3, write_image_path)
-
         send_and_archive(card_results)
-        # rewrite, instead of sending the card to a list, we will call the send_and_archive function to upload it
-        #finalized_List_Cards.append(card_results)
-        #shutil.move(read_image_path, write_image_path)
-
-timeInHours = (time.time() - start_time) / 3600
-
-print("--- %s seconds ---" % (time.time() - start_time))
-print("--- %s hours ---" % timeInHours)
-
 '''
-END - Read File - local
+    END
 '''
+
+def main():
+    #start_time = time.time()
+
+    source = 'Z:/MTGImages' 
+    destination = 'Z:/MTGArchived'
+
+    # copying the directory structure from source into desitination
+    shutil.copytree(source,destination,ignore=ignore_files, dirs_exist_ok=True)
+
+    filesToAnalyze = []
+
+    # this grabs the list of files we want to send through computer vision and appends them to our list
+    for subdir, dirs, files in os.walk(source):
+            if subdir != source:
+                    head, tail = os.path.split(subdir)
+                    if files:
+                            for file in files:
+                                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                                        sourceFile = os.path.join(subdir,file)
+                                        sourceFile = sourceFile.replace('\\', '/')
+                                        destFile = sourceFile.replace(source,destination)
+                                        filesToAnalyze.append([sourceFile,destFile,tail])
+            
+
+    # threading implementation
+    threads = [Thread(target=call_cv, args=(r[0], r[1], r[2]))
+        for r in filesToAnalyze]
+
+    # start the threads
+    for thread in threads:
+        thread.start()
+
+    # wait for the threads to complete
+    for thread in threads:
+        thread.join()
+
+if __name__ == "__main__":
+    start_time = perf_counter()
+
+    main()
+
+    end_time = perf_counter()
+    print(f'It took {end_time- start_time :0.2f} second(s) to complete.')
