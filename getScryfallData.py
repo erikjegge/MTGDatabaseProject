@@ -60,7 +60,7 @@ for r in listOfCards:
 
         sqlString = (
                     "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET cardPrice = "+str(price)+", manaCost = '"+str(manaCost)+"', color = '"+str(colors)+"', [type] = '"+str(type)+"', [cardID] = '"+str(cardId)+"' "
+                    "SET manaCost = '"+str(manaCost)+"', color = '"+str(colors)+"', [type] = '"+str(type)+"', [cardID] = '"+str(cardId)+"' "
                     "WHERE cardName = '"+cardName+"' AND [set] = '"+r[1]+"' "
         )
 

@@ -1,6 +1,6 @@
 import scrython
 
-card = scrython.cards.Named(exact='Nicol Bolas',set='CHR')
+card = scrython.cards.Named(exact='Foe-Razer Regent',set='DTK')
 
 
 print(card.name())
