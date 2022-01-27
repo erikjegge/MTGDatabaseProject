@@ -14,10 +14,18 @@ driver= '{ODBC Driver 17 for SQL Server}'
 conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
 cursor = conn.cursor()
 
-query = ("SELECT cardName, [set] "
-        "FROM [dbo].[tbl_MTGCardLibrary] "
-        "GROUP BY cardName, [set]" )
+onlyNewCards = True
 
+if onlyNewCards:
+    query = ("SELECT cardName, [set] "
+            "FROM [dbo].[tbl_MTGCardLibrary] "
+            "WHERE [Type] IS NULL "
+            "GROUP BY cardName, [set]" )
+else:
+    query = ("SELECT cardName, [set] "
+            "FROM [dbo].[tbl_MTGCardLibrary] "
+            "GROUP BY cardName, [set]" )
+    
 cursor.execute(query)
 
 result = cursor.fetchall() #//result = (1,2,3,) or  result =((1,3),(4,5),)

@@ -225,7 +225,7 @@ def main():
         theadCount += 1
         if theadCount >= 9:
             theadCount = 1
-            time.sleep(1.5)
+            time.sleep(2)
 
     # wait for the threads to complete
     for thread in threads:
