@@ -1,6 +1,9 @@
+from pickle import FALSE
 import scrython
 import pyodbc
+import asyncio
 from datetime import date
+import aiohttp
 
 today = date.today()
 d1 = today.strftime("%m/%d/%Y")
@@ -14,7 +17,7 @@ driver= '{ODBC Driver 17 for SQL Server}'
 conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
 cursor = conn.cursor()
 
-onlyNewCards = True
+onlyNewCards = False
 
 if onlyNewCards:
     query = ("SELECT cardName, [set] "
@@ -84,7 +87,7 @@ for r in listOfCards:
         cursor.execute(sqlString)
         conn.commit()
 
-    except (scrython.foundation.ScryfallError):
+    except (scrython.foundation.ScryfallError, asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ContentTypeError):
         print('card not found')
         pass
 
