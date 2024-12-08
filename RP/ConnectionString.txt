@@ -1,0 +1,12 @@
+sudo mkdir /mnt/imagestorage
+if [ ! -d "/etc/smbcredentials" ]; then
+sudo mkdir /etc/smbcredentials
+fi
+if [ ! -f "/etc/smbcredentials/eeimagestoragecvt.cred" ]; then
+    sudo bash -c 'echo "username=eeimagestoragecvt" >> /etc/smbcredentials/eeimagestoragecvt.cred'
+    sudo bash -c 'echo "password=xt1H63fbHwzmnsEiM7b7VMZ2YIuS4yA1shJ5ga0nYabx0U8xfTWD2AYXRKHCVyAYgyjT0eeS1FVMhwuz62N8rg==" >> /etc/smbcredentials/eeimagestoragecvt.cred'
+fi
+sudo chmod 600 /etc/smbcredentials/eeimagestoragecvt.cred
+
+sudo bash -c 'echo "//eeimagestoragecvt.file.core.windows.net/imagestorage /mnt/imagestorage cifs nofail,vers=3.0,credentials=/etc/smbcredentials/eeimagestoragecvt.cred,dir_mode=0777,file_mode=0777,serverino" >> /etc/fstab'
+sudo mount -t cifs //eeimagestoragecvt.file.core.windows.net/imagestorage /mnt/imagestorage -o vers=3.0,credentials=/etc/smbcredentials/eeimagestoragecvt.cred,dir_mode=0777,file_mode=0777,serverino
