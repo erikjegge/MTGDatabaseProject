@@ -28,7 +28,6 @@ References:
 # <snippet_imports_and_vars>
 # <snippet_imports>
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
-from azure.cognitiveservices.vision.computervision.models import OperationStatusCodes
 from azure.cognitiveservices.vision.computervision.models import VisualFeatureTypes
 from msrest.authentication import CognitiveServicesCredentials
 
@@ -52,9 +51,6 @@ import time
 import threading
 from threading import Thread
 from time import perf_counter
-
-#credentials
-from decouple import config 
 
 #globabls
 # I can only call the API 10 times a second. So this would be the max
@@ -101,10 +97,10 @@ END - Quickstart variables
 # takes a list called card
 def send_and_archive(card):
     #connection string
-    server = config('SERVER')
-    database = config('DATABASE')
-    username = config('DB_USERNAME')
-    password = config('DB_PASSWORD')
+    server = 'computervisioneemtg.database.windows.net'
+    database = 'EEComputerVisionDB'
+    username = 'eggeej'
+    password = 'G$y1(5!hwfUsR4<o}HlK'
     driver= '{ODBC Driver 17 for SQL Server}'
 
     conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
@@ -115,18 +111,10 @@ def send_and_archive(card):
     write_image_path = card[3]
 
     sqlString = (
-            "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath],[isFoil]) "
+            "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath]) "
             "VALUES "
-            "('"+cardName+"',1,NULL,NULL,'"+card[1]+"','"+card[-1]+"',0)"
+            "('"+cardName+"',1,NULL,NULL,'"+card[1]+"','"+card[-1]+"')"
     )
-
-    if "_FOIL" in card[-1]:
-        sqlString = (
-                "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath],[isFoil]) "
-                "VALUES "
-                "('"+cardName+"',1,NULL,NULL,'"+card[1]+"','"+card[-1]+"',1)"
-        )
-    
     cursor.execute(sqlString)
     conn.commit()
 

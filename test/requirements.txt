@@ -1,0 +1,4 @@
+azure_storage==0.37.0
+msrest==0.7.1
+Pillow==10.2.0
+pyodbc==5.1.0
