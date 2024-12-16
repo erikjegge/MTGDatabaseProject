@@ -5,7 +5,7 @@ Since then, the collection has grown to over 100,000 cards and I have added many
 This project is divided into a few different operational processes.
 
 1.	Computer Vision: Taking a picture of a card and from that, reading in the name of the card to the database. 
-2.	Scryfall Data: I read from my database. Then, using the Scryfall API, grab all pricing information for each unique card in my collection. Storing the old data as historical price information so I can track changes for each card. I have a series of SQL queries and procedures that help track historical price changes and cost basis.
+2.	Scryfall Data: I read from my database. Then, using the [Scryfall API](https://github.com/NandaScott/Scrython), grab all pricing information for each unique card in my collection. Storing the old data as historical price information so I can track changes for each card. I have a series of SQL queries and procedures that help track historical price changes and cost basis.
 3.	Operational Projects: SQL queries that make uploading to ebay a breeze and some python scripts that make certain aspects such as adding pictures to these listings a bit more automated.
 
 Future state, I have a lot of upgrades in mind. 
