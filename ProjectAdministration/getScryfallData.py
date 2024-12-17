@@ -4,7 +4,7 @@ import pyodbc
 import asyncio
 from datetime import date
 import aiohttp
-from decouple import config 
+from decouple import config
 
 today = date.today()
 d1 = today.strftime("%m/%d/%Y")
@@ -34,7 +34,6 @@ else:
                                         "WHERE asOfDate = DATEADD(dd, 0, DATEDIFF(dd, 0, GETDATE())) "
                                         "GROUP BY cardID, asOfDate) a) "
                 "GROUP BY cl.cardName, cl.[set], cl.cardID " )
-
 
 cursor.execute(query)
 

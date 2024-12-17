@@ -66,8 +66,8 @@ Authenticate
 Authenticates your credentials and creates a client.
 '''
 # <snippet_vars>
-subscription_key = "f134ce90ca1042189a58c629af33466e"
-endpoint = "https://eecomputervisiontesting.cognitiveservices.azure.com/"
+subscription_key = config('CVSUBSCRIPTIONKEY')
+endpoint = config('CVENDPOINT')
 
 # </snippet_vars>
 # </snippet_imports_and_vars>
