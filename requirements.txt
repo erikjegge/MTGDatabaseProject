@@ -1,0 +1,7 @@
+easyocr
+opencv-python
+pillow
+pyodbc
+python-decouple
+numpy
+tqdm
