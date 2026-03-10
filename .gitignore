@@ -127,3 +127,17 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# images
+.jpg
+.png
+
+# Project-specific
+ImageReaderCode/output/
+.env
+.env.*
+Z:/MTGImages/
+Z:/MTGArchived/
+build/
+dist/
+*.log
