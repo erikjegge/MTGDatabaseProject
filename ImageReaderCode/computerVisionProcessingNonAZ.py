@@ -95,7 +95,7 @@ def call_cv(read_image_path, write_image_path, setAbrev):
             card_name = "XXX"
         else:
             # 1️⃣ Rotate counter-clockwise unless it's from the scanner then don't
-            if 'Document_' not in read_image_path:
+            if ('Document_' not in read_image_path) and ('imageV3_' not in read_image_path):
                 img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
             # 2️⃣ Grayscale + slight upscale
@@ -104,11 +104,17 @@ def call_cv(read_image_path, write_image_path, setAbrev):
 
             h, w = gray.shape
 
-            # 3️⃣ Crop top-half name region
-            y1 = int(h * 0.05)
-            y2 = int(h * 0.35)
-            x1 = int(w * 0.05)
-            x2 = int(w * 0.95)
+            if ('imageV3_' in read_image_path):
+                # 3️⃣ Crop top-half name region
+                y1 = 0
+                y2 = int(h * 0.20)
+                x1 = 0
+                x2 = w
+            else:
+                y1 = int(h * 0.05)
+                y2 = int(h * 0.35)
+                x1 = int(w * 0.05)
+                x2 = int(w * 0.95)
 
             roi = gray[y1:y2, x1:x2]
 
