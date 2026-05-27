@@ -1,5 +1,6 @@
 import os
 import asyncio
+import time
 from datetime import date
 from pickle import FALSE, TRUE
 import scrython
@@ -24,6 +25,19 @@ gSet = ''
 gName = ''
 gNamePrev = ''
 IMAGE_PATH = "./candidates/"
+
+def scryfall_call(fn, *args, **kwargs):
+    """Call a scrython constructor with retry on rate limit."""
+    while True:
+        time.sleep(0.5)
+        try:
+            return fn(*args, **kwargs)
+        except scrython.foundation.ScryfallError as e:
+            if 'rate' in str(e).lower():
+                print('Rate limited by Scryfall, waiting 65 seconds...')
+                time.sleep(65)
+            else:
+                raise
 
 def getKnownCards(set):
     conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
@@ -53,10 +67,10 @@ cursor = conn.cursor()
 onlyNewCards = False
 
 if onlyNewCards:
-    query = ("SELECT cardName, [set] "
+    query = ("SELECT cardName, [set], cardID "
             "FROM [dbo].[tbl_MTGCardLibrary] "
             "WHERE [Type] IS NULL "
-            "GROUP BY cardName, [set] "
+            "GROUP BY cardName, [set], cardID "
             "ORDER BY [set], cardName" )
 else:
     # changed this to be, ALL but only if the card hasn't been added yet today
@@ -85,54 +99,51 @@ for r in listOfCards:
 
         print('<><><><><><><><><><><><><><><><>')
         print(r[0])
-        # matching here
-        # if the name unaltered is already in the list 
-        # if not xxx both for set and also for card name
-
-        gName = r[0] #.replace("'", "''")
+        gName = r[0]
         setfinal = r[1]
+        cardId = r[2]   
         fixedName = ''
 
-        if setfinal == '_CON':
-            setfinal = 'CON'
+        if not cardId:
+            if setfinal == '_CON':
+                setfinal = 'CON'
 
-        if setfinal == 'XXX':
-            data = scrython.cards.Search(q="++{}".format(r[0]))
-            if len(data.data()) == 1:
-                for card in data.data():
-                    setfinal = card['set'].upper()
+            if setfinal == 'XXX':
+                data = scryfall_call(scrython.cards.Search, q="++{}".format(r[0]))
+                if len(data.data()) == 1:
+                    for card in data.data():
+                        setfinal = card['set'].upper()
 
-        if setfinal == 'XXX':
-            continue
+            if setfinal == 'XXX':
+                continue
 
-        if onlyNewCards and gName != 'XXX':
-            if setfinal != gSet:
-                card_list = getKnownCards(setfinal)
+            if onlyNewCards and gName != 'XXX':
+                if setfinal != gSet:
+                    card_list = getKnownCards(setfinal)
 
-            match = process.extractOne(
-                gName,
-                card_list,
-                scorer=fuzz.token_set_ratio
-            )
+                match = process.extractOne(
+                    gName,
+                    card_list,
+                    scorer=fuzz.token_set_ratio
+                )
 
-            if match:
-                card_name, score, index = match
+                if match:
+                    card_name, score, index = match
 
-                if score >= 85:
-                    print(f"Matched: {card_name} ({score}%)")
-                    fixedName = card_name
-                else:
-                    print("No confident match found")
+                    if score >= 85:
+                        print(f"Matched: {card_name} ({score}%)")
+                        fixedName = card_name
+                    else:
+                        print("No confident match found")
 
-        gSet = setfinal
+            gSet = setfinal
 
-        if fixedName:
-            card = scrython.cards.Named(exact=fixedName,set=setfinal)
+            if fixedName:
+                card = scryfall_call(scrython.cards.Named, exact=fixedName, set=setfinal)
+            else:
+                card = scryfall_call(scrython.cards.Named, exact=gName, set=setfinal)
         else:
-            card = scrython.cards.Named(exact=gName,set=setfinal)
-
-        #card names can have single quotes
-        #cardName = gName
+            card = scryfall_call(scrython.cards.Id, id=cardId)
 
         price = card.prices('usd')
         if not price:
@@ -165,12 +176,16 @@ for r in listOfCards:
         except(KeyError):
             realName = ''
 
+        try:
+            setfinal = card.scryfallJson["set"].upper()
+        except (KeyError, AttributeError):
+            setfinal = ''
         cardId = card.id()
 
         sqlString = (
                     "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET [set] = '"+setfinal+"' "
-                    "WHERE cardName = '"+gName.replace("'", "''")+"' AND ([set] = '"+str(r[1])+"')"
+                    "SET [cardID] = '"+str(cardId)+"' "
+                    "WHERE cardName = '"+gName.replace("'", "''")+"' AND ([set] = '"+setfinal+"')"
         )
 
         try:
@@ -183,8 +198,8 @@ for r in listOfCards:
 
         sqlString = (
                     "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET manaCost = '"+str(manaCost)+"', color = '"+str(colors)+"', [type] = '"+str(type)+"', [cardID] = '"+str(cardId)+"', cardName = '"+str(realName)+"' "
-                    "WHERE cardName = '"+gName.replace("'", "''")+"' AND [set] = '"+setfinal+"' "
+                    "SET manaCost = '"+str(manaCost)+"', color = '"+str(colors)+"', [type] = '"+str(type)+"', cardName = '"+str(realName)+"' "
+                    "WHERE [cardID] = '"+str(cardId)+"' "
         )
 
         try:
@@ -216,24 +231,24 @@ for r in listOfCards:
 
     except (scrython.foundation.ScryfallError, asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ContentTypeError):
         print('card not found')
-        conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
-        cursor = conn.cursor()
-        sqlString = (
-                    "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET [cardID] = NULL, [Type] = NULL "
-                    "WHERE cardName = '"+gName.replace("'", "''")+"' AND [set] = '"+gSet+"' AND boxCode <> 0"
-        )
+        # conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
+        # cursor = conn.cursor()
+        # sqlString = (
+        #             "UPDATE [dbo].[tbl_MTGCardLibrary] "
+        #             "SET [cardID] = NULL, [Type] = NULL "
+        #             "WHERE cardName = '"+gName.replace("'", "''")+"' AND [set] = '"+gSet+"' AND boxCode <> 0"
+        # )
 
-        try:
-            cursor.execute(sqlString)
-            conn.commit()
-        except pyodbc.OperationalError as e:
-            print("Commit failed:", e)
-            # Optionally reconnect or log the failure
-            pass
-        conn.close
-        cursor.close
-        pass
+        # try:
+        #     cursor.execute(sqlString)
+        #     conn.commit()
+        # except pyodbc.OperationalError as e:
+        #     print("Commit failed:", e)
+        #     # Optionally reconnect or log the failure
+        #     pass
+        # conn.close
+        # cursor.close
+        # pass
 
 conn.close
 cursor.close

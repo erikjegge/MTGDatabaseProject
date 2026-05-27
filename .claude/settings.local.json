@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"e:\\\\Projects\\\\MTGDatabaseProject\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(python -c \"import scrython; import inspect; c = scrython.cards.Card; print\\([m for m in dir\\(c\\) if not m.startswith\\('_'\\)]\\)\")",
+      "Bash(python -c \"import scrython; c = scrython.cards.Id; print\\([m for m in dir\\(c\\) if not m.startswith\\('_'\\)]\\)\")"
+    ]
+  }
+}
