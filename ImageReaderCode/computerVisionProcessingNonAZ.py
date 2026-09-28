@@ -47,31 +47,35 @@ def send_and_archive(card):
     conn = pyodbc.connect('DRIVER='+driver+';PORT=1433;SERVER='+server+';PORT=1443;DATABASE='+database+';UID='+username+';PWD='+ password)
     cursor = conn.cursor()
 
-    cardName = card[0].replace("'", "''")
     read_image_path = card[2]
     write_image_path = card[3]
 
-    split_filepath = card[-1].split("_")
-    pkCostBasisLot = split_filepath[2]
-    boxCode = split_filepath[3]
+    # filename format: <prefix>_<date>[_FOIL]_<pkCostBasisLot>_<boxCode>[_SB<subBoxCode>]_<seq>.jpg
+    #   e.g. Document_20250301_65_22_0001.jpg
+    #        Document_20250301_FOIL_65_22_SB3_0001.jpg
+    # FOIL and SB<n> are optional tags, so pull them out first and the rest stays positional
+    split_filepath = os.path.splitext(card[-1])[0].split("_")
+
+    isFoil = 1 if "FOIL" in split_filepath else 0
+    subBoxCode = None
+    parts = []
+    for part in split_filepath:
+        if part == "FOIL":
+            continue
+        if re.fullmatch(r"SB\d+", part):
+            subBoxCode = int(part[2:])
+            continue
+        parts.append(part)
+
+    pkCostBasisLot = int(parts[2])
+    boxCode = int(parts[3])
 
     sqlString = (
-            "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath],[isFoil],[pkCostBasisLot],[boxCode]) "
-            "VALUES "
-            "('"+cardName+"',1,NULL,NULL,'"+card[1]+"','"+card[-1]+"',0,"+pkCostBasisLot+","+boxCode+")"
+            "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath],[isFoil],[pkCostBasisLot],[boxCode],[subBoxCode]) "
+            "VALUES (?,1,NULL,NULL,?,?,?,?,?,?)"
     )
 
-    if "_FOIL" in card[-1]:
-        pkCostBasisLot = split_filepath[3]
-        boxCode = split_filepath[4]
-        sqlString = (
-                "INSERT INTO tbl_MTGCardLibrary ([cardName],[isEnabled],[color],[type],[set],[filepath],[isFoil],[pkCostBasisLot],[boxCode]) "
-                "VALUES "
-                "('"+cardName+"',1,NULL,NULL,'"+card[1]+"','"+card[-1]+"',1,"+pkCostBasisLot+","+boxCode+")"
-        )
-
-    #print(sqlString)
-    cursor.execute(sqlString)
+    cursor.execute(sqlString, card[0], card[1], card[-1], isFoil, pkCostBasisLot, boxCode, subBoxCode)
     conn.commit()
 
     # move the file to the archive

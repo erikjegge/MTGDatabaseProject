@@ -61,7 +61,11 @@ if __name__ == '__main__':
     sql = (
         "INSERT INTO [dbo].[tbl_MTGPriceHistory] VALUES(?, ?, ?, ?)"
     )
+    tcg_sql = (
+        "UPDATE [dbo].[tbl_MTGCardLibrary] SET tcgPlayerID = ? WHERE cardID = ?"
+    )
     batch = []
+    tcg_batch = []
 
     conn = get_connection()
     try:
@@ -74,13 +78,22 @@ if __name__ == '__main__':
                 foil_price = card.prices('usd_foil') or 0.0
                 batch.append((card_id, price, d1, foil_price))
 
+                # Not every printing has a TCGplayer product (some promos, digital-only cards)
+                tcg_id = card.scryfallJson.get('tcgplayer_id')
+                if tcg_id is not None:
+                    tcg_batch.append((tcg_id, card_id))
+
                 if len(batch) >= BATCH_SIZE:
                     flush_batch(cursor, conn, sql, batch)
+                if len(tcg_batch) >= BATCH_SIZE:
+                    flush_batch(cursor, conn, tcg_sql, tcg_batch)
 
             except (scrython.foundation.ScryfallError, asyncio.exceptions.TimeoutError, aiohttp.client_exceptions.ContentTypeError):
                 print('card not found')
 
         if batch:
             flush_batch(cursor, conn, sql, batch)
+        if tcg_batch:
+            flush_batch(cursor, conn, tcg_sql, tcg_batch)
     finally:
         conn.close()

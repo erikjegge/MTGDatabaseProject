@@ -5,7 +5,17 @@
       "Bash(Select-Object Name, PSIsContainer)",
       "Bash(Format-Table -AutoSize)",
       "Bash(python -c \"import scrython; import inspect; c = scrython.cards.Card; print\\([m for m in dir\\(c\\) if not m.startswith\\('_'\\)]\\)\")",
-      "Bash(python -c \"import scrython; c = scrython.cards.Id; print\\([m for m in dir\\(c\\) if not m.startswith\\('_'\\)]\\)\")"
+      "Bash(python -c \"import scrython; c = scrython.cards.Id; print\\([m for m in dir\\(c\\) if not m.startswith\\('_'\\)]\\)\")",
+      "Bash(python -c \"from PIL import Image; im = Image.open\\('Z:/MTGArchived/XXX/image_XXX_64_123_20260309173836.jpg'\\); print\\(im.size, im.info.get\\('dpi'\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python ImageReaderCode/FindSuspiciousCardNames.py)",
+      "Bash(break)",
+      "Bash(python -m py_compile ProjectAdministration/pullSheetPicker.py)",
+      "Bash(python pullSheetPicker.py TCGplayer_PullSheet_20260803_124510.csv)",
+      "Bash(python -m py_compile pullSheetPicker.py)",
+      "Bash(python -c \"import openpyxl; print\\('openpyxl', openpyxl.__version__\\)\")",
+      "Bash(python -c \"import pandas; print\\('pandas', pandas.__version__\\)\")",
+      "Bash(python -c \"import tkinter; print\\('tkinter ok'\\)\")"
     ]
   }
 }

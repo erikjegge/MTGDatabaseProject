@@ -3,6 +3,7 @@
 '''
 import os
 import time
+import itertools
 import scrython
 import pyodbc
 from decouple import config
@@ -197,181 +198,221 @@ def scryfall_call(fn, *args, **kwargs):
                 raise
 
 
-def main():
-    conn = pyodbc.connect(DB_CONN_STR)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT cardName, [set], pkCard, filepath "
-        "FROM [dbo].[tbl_MTGCardLibrary] "
-        "WHERE [cardID] IS NULL AND [set] = 'XXX' AND cardName <> 'XXX' AND filepath like 'imageV3_%' "
-        "ORDER BY [set], cardName"
-    )
-    listOfCards = [list(row) for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+def scryfall_call_with_name_scramble(name, set_code):
+    """Try cleaned and word-order permutations of `name` when the exact lookup fails.
 
-    for r in listOfCards:
-        setfinal = r[1]
-        pkCard = r[2]
-        filePath = r[3]
-        matchedCardID = None
+    Filters out garbage tokens (1-2 chars, e.g. 't', 'Lo') before permuting.
+    Only generates permutations for names with 4 or fewer words to avoid
+    combinatorial explosion.
+    """
+    try:
+        return scryfall_call(scrython.cards.Named, exact=name, set=set_code)
+    except scrython.foundation.ScryfallError as e:
+        if 'No cards found' not in str(e):
+            raise
 
+    words = [w for w in name.split() if len(w) > 2]
+
+    if not words:
+        msg = f'No valid words remaining after filtering "{name}"'
+        raise scrython.foundation.ScryfallError({'details': msg}, msg)
+
+    if len(words) <= 4:
+        candidates = list(dict.fromkeys(' '.join(p) for p in itertools.permutations(words)))
+    else:
+        candidates = [' '.join(words)]
+
+    for candidate in candidates:
+        if candidate == name:
+            continue
         try:
-            conn = pyodbc.connect(DB_CONN_STR)
-            cursor = conn.cursor()
-
-            print('<><><><><><><><><><><><><><><><>')
-            print(r[0])
-
-            data = scryfall_call(scrython.cards.Search, q="++{}".format(r[0]))
-            results = data.data()
-            if len(results) == 1:
-                matchedCardID = results[0]["id"]
-                print(f'Only one result found from Scryfall with name: {r[0]}, using id: {matchedCardID}')
-            else:
-                for card in results:
-                    scryid_to_set[card["id"]] = card["set"].upper()
-                candidate_scryids = [card["id"] for card in results]
-                best_match, score = find_best_match(
-                    os.path.join(IMAGE_ARCH, setfinal, filePath),
-                    candidate_scryids,
-                    True
-                )
-                print('-----------------------------')
-                predicted_set = get_set_for_scryid(best_match)
-                print(pkCard)
-                print(filePath)
-                print(f"Best match: {best_match}")
-                print(f"Score: {score}")
-                print(f"Predicted set: {predicted_set}")
-                cardImage = save_debug_images(
-                    os.path.join(IMAGE_ARCH, setfinal, filePath),
-                    best_match, predicted_set, score
-                )
-                cursor.execute(
-                    "INSERT INTO [dbo].[tbl_MTGCardLibraryVerify] (pkCard, matchCardID, cardImage) VALUES (?, ?, ?)",
-                    pkCard, best_match, cardImage
-                )
-                conn.commit()
-                print(f'Inserted into verification table: pkCard={pkCard}, matchCardID={best_match}')
-                matchedCardID = None
-
-            if matchedCardID is None:
-                cursor.close()
-                conn.close()
+            result = scryfall_call(scrython.cards.Named, exact=candidate, set=set_code)
+            print(f'  Name scramble succeeded: "{name}" -> "{candidate}"')
+            return result
+        except scrython.foundation.ScryfallError as e:
+            if 'No cards found' in str(e):
                 continue
+            raise
 
-            card = scryfall_call(scrython.cards.Id, id=matchedCardID)
+    msg = f'No cards found matching "{name}" (tried {len(candidates)} permutations after filtering)'
+    raise scrython.foundation.ScryfallError({'details': msg}, msg)
 
-            try:
-                card_type = card.type_line()
-            except KeyError:
-                card_type = ''
 
-            try:
-                manaCost = card.mana_cost()
-            except KeyError:
-                manaCost = ''
+def main():
+    # conn = pyodbc.connect(DB_CONN_STR)
+    # cursor = conn.cursor()
+    # cursor.execute(
+    #     "SELECT cardName, [set], pkCard, filepath "
+    #     "FROM [dbo].[tbl_MTGCardLibrary] "
+    #     "WHERE [cardID] IS NULL AND [set] = 'XXX' AND cardName <> 'XXX' AND filepath like 'imageV3_%' "
+    #     "ORDER BY [set], cardName"
+    # )
+    # listOfCards = [list(row) for row in cursor.fetchall()]
+    # cursor.close()
+    # conn.close()
 
-            try:
-                colors = ''.join(card.colors())
-            except KeyError:
-                colors = ''
+    # for r in listOfCards:
+    #     setfinal = r[1]
+    #     pkCard = r[2]
+    #     filePath = r[3]
+    #     matchedCardID = None
 
-            try:
-                realName = ''.join(card.name())
-            except KeyError:
-                realName = ''
+    #     try:
+    #         conn = pyodbc.connect(DB_CONN_STR)
+    #         cursor = conn.cursor()
 
-            try:
-                set = card.set_code().upper()
-            except KeyError:
-                set = ''
+    #         print('<><><><><><><><><><><><><><><><>')
+    #         print(r[0])
 
-            cardId = card.id()
+    #         data = scryfall_call(scrython.cards.Search, q="++{}".format(r[0]))
+    #         results = data.data()
+    #         if len(results) == 1:
+    #             matchedCardID = results[0]["id"]
+    #             print(f'Only one result found from Scryfall with name: {r[0]}, using id: {matchedCardID}')
+    #         else:
+    #             for card in results:
+    #                 scryid_to_set[card["id"]] = card["set"].upper()
+    #             candidate_scryids = [card["id"] for card in results]
+    #             best_match, score = find_best_match(
+    #                 os.path.join(IMAGE_ARCH, setfinal, filePath),
+    #                 candidate_scryids,
+    #                 True
+    #             )
+    #             print('-----------------------------')
+    #             predicted_set = get_set_for_scryid(best_match)
+    #             print(pkCard)
+    #             print(filePath)
+    #             print(f"Best match: {best_match}")
+    #             print(f"Score: {score}")
+    #             print(f"Predicted set: {predicted_set}")
+    #             cardImage = save_debug_images(
+    #                 os.path.join(IMAGE_ARCH, setfinal, filePath),
+    #                 best_match, predicted_set, score
+    #             )
+    #             cursor.execute(
+    #                 "INSERT INTO [dbo].[tbl_MTGCardLibraryVerify] (pkCard, matchCardID, cardImage) VALUES (?, ?, ?)",
+    #                 pkCard, best_match, cardImage
+    #             )
+    #             conn.commit()
+    #             print(f'Inserted into verification table: pkCard={pkCard}, matchCardID={best_match}')
+    #             matchedCardID = None
 
-            try:
-                cursor.execute(
-                    "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET manaCost = ?, color = ?, [type] = ?, [cardID] = ?, cardName = ?, [set] = ? "
-                    "WHERE pkCard = ?",
-                    str(manaCost), str(colors), str(card_type), str(cardId), str(realName), str(set), str(pkCard)
-                )
-                conn.commit()
-            except pyodbc.OperationalError as e:
-                print("Commit failed:", e)
+    #         if matchedCardID is None:
+    #             cursor.close()
+    #             conn.close()
+    #             continue
 
-            cursor.close()
-            conn.close()
+    #         card = scryfall_call(scrython.cards.Id, id=matchedCardID)
 
-        except Exception as e:
-            print(f'ERROR [{type(e).__name__}]: {e} | card={r[0]} set={setfinal} pkCard={pkCard}')
+    #         try:
+    #             card_type = card.type_line()
+    #         except KeyError:
+    #             card_type = ''
+
+    #         try:
+    #             manaCost = card.mana_cost()
+    #         except KeyError:
+    #             manaCost = ''
+
+    #         try:
+    #             colors = ''.join(card.colors())
+    #         except KeyError:
+    #             colors = ''
+
+    #         try:
+    #             realName = ''.join(card.name())
+    #         except KeyError:
+    #             realName = ''
+
+    #         try:
+    #             set = card.set_code().upper()
+    #         except KeyError:
+    #             set = ''
+
+    #         cardId = card.id()
+
+    #         try:
+    #             cursor.execute(
+    #                 "UPDATE [dbo].[tbl_MTGCardLibrary] "
+    #                 "SET manaCost = ?, color = ?, [type] = ?, [cardID] = ?, cardName = ?, [set] = ? "
+    #                 "WHERE pkCard = ?",
+    #                 str(manaCost), str(colors), str(card_type), str(cardId), str(realName), str(set), str(pkCard)
+    #             )
+    #             conn.commit()
+    #         except pyodbc.OperationalError as e:
+    #             print("Commit failed:", e)
+
+    #         cursor.close()
+    #         conn.close()
+
+    #     except Exception as e:
+    #         print(f'ERROR [{type(e).__name__}]: {e} | card={r[0]} set={setfinal} pkCard={pkCard}')
     
-    # Need to add second and third data set process here.
-    # 2. Have ID but set = XXX
-    print('trying 2nd scenario')
-    conn = pyodbc.connect(DB_CONN_STR)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT [cardID], pkCard "
-        "FROM [dbo].[tbl_MTGCardLibrary] "
-        "WHERE [cardID] IS NOT NULL AND [set] = 'XXX' "
-        "ORDER BY [set], cardName"
-    )
-    listOfCards = [list(row) for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+    # # Need to add second and third data set process here.
+    # # 2. Have ID but set = XXX
+    # print('trying 2nd scenario')
+    # conn = pyodbc.connect(DB_CONN_STR)
+    # cursor = conn.cursor()
+    # cursor.execute(
+    #     "SELECT [cardID], pkCard "
+    #     "FROM [dbo].[tbl_MTGCardLibrary] "
+    #     "WHERE [cardID] IS NOT NULL AND [set] = 'XXX' "
+    #     "ORDER BY [set], cardName"
+    # )
+    # listOfCards = [list(row) for row in cursor.fetchall()]
+    # cursor.close()
+    # conn.close()
 
-    for x in listOfCards:
-        cardID = x[0]
-        pkCard = x[1]
-        try:
-            conn = pyodbc.connect(DB_CONN_STR)
-            cursor = conn.cursor()
+    # for x in listOfCards:
+    #     cardID = x[0]
+    #     pkCard = x[1]
+    #     try:
+    #         conn = pyodbc.connect(DB_CONN_STR)
+    #         cursor = conn.cursor()
 
-            card = scryfall_call(scrython.cards.Id, id=cardID)
+    #         card = scryfall_call(scrython.cards.Id, id=cardID)
 
-            try:
-                card_type = card.type_line()
-            except KeyError:
-                card_type = ''
+    #         try:
+    #             card_type = card.type_line()
+    #         except KeyError:
+    #             card_type = ''
 
-            try:
-                manaCost = card.mana_cost()
-            except KeyError:
-                manaCost = ''
+    #         try:
+    #             manaCost = card.mana_cost()
+    #         except KeyError:
+    #             manaCost = ''
 
-            try:
-                colors = ''.join(card.colors())
-            except KeyError:
-                colors = ''
+    #         try:
+    #             colors = ''.join(card.colors())
+    #         except KeyError:
+    #             colors = ''
 
-            try:
-                realName = ''.join(card.name())
-            except KeyError:
-                realName = ''
+    #         try:
+    #             realName = ''.join(card.name())
+    #         except KeyError:
+    #             realName = ''
 
-            try:
-                set = card.set_code().upper()
-            except KeyError:
-                set = ''
+    #         try:
+    #             set = card.set_code().upper()
+    #         except KeyError:
+    #             set = ''
 
-            try:
-                cursor.execute(
-                    "UPDATE [dbo].[tbl_MTGCardLibrary] "
-                    "SET manaCost = ?, color = ?, [type] = ?, cardName = ?, [set] = ? "
-                    "WHERE pkCard = ?",
-                    str(manaCost), str(colors), str(card_type), str(realName), str(set), str(pkCard)
-                )
-                conn.commit()
-            except pyodbc.OperationalError as e:
-                print("Commit failed:", e)
+    #         try:
+    #             cursor.execute(
+    #                 "UPDATE [dbo].[tbl_MTGCardLibrary] "
+    #                 "SET manaCost = ?, color = ?, [type] = ?, cardName = ?, [set] = ? "
+    #                 "WHERE pkCard = ?",
+    #                 str(manaCost), str(colors), str(card_type), str(realName), str(set), str(pkCard)
+    #             )
+    #             conn.commit()
+    #         except pyodbc.OperationalError as e:
+    #             print("Commit failed:", e)
 
-            cursor.close()
-            conn.close()
+    #         cursor.close()
+    #         conn.close()
 
-        except Exception as e:
-            print(f'ERROR [{type(e).__name__}]: {e} | card={r[0]} set={setfinal} pkCard={pkCard}')
+    #     except Exception as e:
+    #         print(f'ERROR [{type(e).__name__}]: {e} | card={r[0]} set={setfinal} pkCard={pkCard}')
 
 
     # 3. CardID NULL, Card name <> XXX, Set <> XXX
@@ -389,7 +430,7 @@ def main():
     conn.close()
 
     for x in listOfCards:
-        cardID = x[0]
+        #cardID = x[0]
         pkCard = x[1]
         dbset = x[2]
         dbcardName = x[3]
@@ -398,7 +439,7 @@ def main():
             conn = pyodbc.connect(DB_CONN_STR)
             cursor = conn.cursor()
 
-            card = scryfall_call(scrython.cards.Named, exact=dbcardName, set=dbset)
+            card = scryfall_call_with_name_scramble(dbcardName, dbset)
 
             try:
                 card_type = card.type_line()
@@ -438,7 +479,6 @@ def main():
 
         except Exception as e:
             print(f'ERROR [{type(e).__name__}]: {e} | card={dbcardName} set={dbset} pkCard={pkCard}')
-
 
 if __name__ == '__main__':
     main()
