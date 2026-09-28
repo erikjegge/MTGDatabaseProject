@@ -141,3 +141,6 @@ Z:/MTGArchived/
 build/
 dist/
 *.log
+
+.txt
+.pth
